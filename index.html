@@ -116,7 +116,7 @@
         };
 
         const BUILDINGS_DATA = {
-            MAYOR_HOUSE: { name: 'Manoir du Maire', cost: 1000, maxLvl: 3, desc: 'Si détruit (Niv 0), c\'est la DÉFAITE.', icon: Crown },
+            MAYOR_HOUSE: { name: 'Manoir du Maire', cost: 1000, maxLvl: 2, desc: 'Si détruit (Niv 0), c\'est la DÉFAITE.', icon: Crown }, // MAX LVL 2
             HOUSING: { name: 'Habitations', cost: 150, maxLvl: 5, desc: 'Augmente la limite de population (+5 places/niv).' },
             BARRACKS: { name: 'Caserne', cost: 150, maxLvl: 3, desc: 'Centre d\'entraînement. Augmente les chances de Level Up (+10%/niv).' },
             HOSPITAL: { name: 'Infirmerie', cost: 100, maxLvl: 3, desc: 'Soins intensifs. Réduit la durée des blessures.' },
@@ -242,7 +242,7 @@
             const [bossCooldowns, setBossCooldowns] = useState({});
 
             const [villages, setVillages] = useState([]); 
-            const [logs, setLogs] = useState([{ day: 1, text: "Bienvenue, Monsieur le Maire." }]); // Message modifié ici
+            const [logs, setLogs] = useState([{ day: 1, text: "Bienvenue, Monsieur le Maire." }]);
             const [notifications, setNotifications] = useState([]); 
             const [currentEvent, setCurrentEvent] = useState(null);
 
@@ -860,7 +860,10 @@
             const canFightWitch = gameStats.dungeons >= 10;
             const canFightMercenary = gameStats.conflicts >= 4;
             const canFightWanderer = gameStats.refused >= 5;
-            const showVagabondShop = gameStats.bossesKilled.includes('BOSS_WANDERER') && !bossCooldowns['BOSS_WANDERER'];
+            
+            // FIX: Vagabond Shop condition corrected
+            const showVagabondShop = gameStats.bossesKilled.includes('BOSS_WANDERER');
+            
             const showTraitor = gameStats.bossesKilled.includes('BOSS_WITCH') && villages.some(v => v.isTraitor) === false && gameStats.bossesKilled.includes('BOSS_MERCENARY');
 
             const maxRoster = 5 + (buildings.HOUSING * 5);
@@ -1002,7 +1005,6 @@
                                 <div onClick={() => { if(day > (bossCooldowns.BOSS_WITCH || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.WITCH, type: 'BOSS_WITCH', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_WITCH || 0) ? 'opacity-50 border-slate-700 cursor-not-allowed' : 'border-purple-500 bg-purple-900/10 hover:bg-purple-900/20'}`}>
                                     <h3 className="font-bold text-purple-400">La Sorcière</h3>
                                     <p className="text-xs text-slate-400">Coût: Gratuit. Loot unique.</p>
-                                    <div className="text-xs text-purple-300 mt-1">Puissance Requise: ???</div>
                                 </div>
                             ) : <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? (Nécessite Bibliothèque)</div>}
 
@@ -1010,14 +1012,12 @@
                                 <div onClick={() => { if(day > (bossCooldowns.BOSS_MERCENARY || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.MERCENARY, type: 'BOSS_MERCENARY', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_MERCENARY || 0) ? 'opacity-50 cursor-not-allowed' : 'border-red-500 bg-red-900/10 hover:bg-red-900/20'}`}>
                                     <h3 className="font-bold text-red-400">Le Mercenaire</h3>
                                     <p className="text-xs text-slate-400">Armée seulement.</p>
-                                    <div className="text-xs text-red-300 mt-1">Puissance Requise: ???</div>
                                 </div>
                             ) : <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? ({gameStats.conflicts}/4 Conflits)</div>}
 
                             {canFightWanderer && !gameStats.bossesKilled.includes('BOSS_WANDERER') ? (
                                 <div onClick={() => { if(day > (bossCooldowns.BOSS_WANDERER || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.WANDERER, type: 'BOSS_WANDERER', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_WANDERER || 0) ? 'opacity-50 cursor-not-allowed' : 'border-amber-500 bg-amber-900/10'}`}>
                                     <h3 className="font-bold text-amber-400">Le Vagabond</h3>
-                                    <div className="text-xs text-amber-300 mt-1">Puissance Requise: ???</div>
                                 </div>
                             ) : !gameStats.bossesKilled.includes('BOSS_WANDERER') ? <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? ({gameStats.refused}/5 Refus)</div> : null}
 

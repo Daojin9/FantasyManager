@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Village Warlord</title>
     
     <!-- 1. Tailwind CSS (Style) -->
@@ -29,20 +29,16 @@
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
         
-        /* FIX MOBILE: On autorise le scroll sur le body par défaut */
         body { 
-            overflow-x: hidden; /* Évite le scroll horizontal accidentel */
             background-color: #0f172a;
-        }
-        
-        /* FIX DESKTOP: On bloque le scroll global seulement sur les grands écrans */
-        @media (min-width: 768px) {
-            body { overflow: hidden; }
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* On bloque le scroll global pour forcer le layout "App" */
         }
     </style>
 </head>
 <body class="text-slate-100">
-    <div id="root" class="h-full w-full"></div>
+    <div id="root" class="h-screen w-screen overflow-hidden"></div>
 
     <!-- 4. LE CODE DU JEU -->
     <script type="text/babel" data-type="module">
@@ -149,7 +145,7 @@
         const DAY_DURATION = 20000; 
         const CONSTRUCTION_TIME = 20000; 
 
-        // --- FONCTIONS UTILITAIRES (HORS DU COMPOSANT POUR SCOPE) ---
+        // --- FONCTIONS UTILITAIRES ---
         const formatTime = (ms) => `${Math.ceil(ms / 1000)}s`;
 
         const getReputationLabel = (rep) => { 
@@ -591,8 +587,6 @@
             const resolveDiplomacy = (mission) => {
                 const hero = roster.find(h => h.id === mission.heroes[0]);
                 const village = villages.find(v => v.id === mission.targetVillageId);
-                if (!village) return; // Village gone?
-
                 let influence = 5 + (hero.level * 2);
                 if (hero.socialTrait && hero.socialTrait.name === 'Diplomate') influence += 15;
                 const success = Math.random() > 0.1;
@@ -860,10 +854,7 @@
             const canFightWitch = gameStats.dungeons >= 10;
             const canFightMercenary = gameStats.conflicts >= 4;
             const canFightWanderer = gameStats.refused >= 5;
-            
-            // FIX: Vagabond Shop condition corrected
-            const showVagabondShop = gameStats.bossesKilled.includes('BOSS_WANDERER');
-            
+            const showVagabondShop = gameStats.bossesKilled.includes('BOSS_WANDERER') && !bossCooldowns['BOSS_WANDERER'];
             const showTraitor = gameStats.bossesKilled.includes('BOSS_WITCH') && villages.some(v => v.isTraitor) === false && gameStats.bossesKilled.includes('BOSS_MERCENARY');
 
             const maxRoster = 5 + (buildings.HOUSING * 5);
@@ -1001,25 +992,25 @@
 
                         <h2 className="text-xl font-bold flex items-center gap-2 text-slate-200 mb-4"><Skull className="text-red-600" /> Menaces Légendaires (Boss)</h2>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {buildings.LIBRARY > 0 ? (
+                            {buildings.LIBRARY > 0 && (
                                 <div onClick={() => { if(day > (bossCooldowns.BOSS_WITCH || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.WITCH, type: 'BOSS_WITCH', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_WITCH || 0) ? 'opacity-50 border-slate-700 cursor-not-allowed' : 'border-purple-500 bg-purple-900/10 hover:bg-purple-900/20'}`}>
                                     <h3 className="font-bold text-purple-400">La Sorcière</h3>
                                     <p className="text-xs text-slate-400">Coût: Gratuit. Loot unique.</p>
                                 </div>
-                            ) : <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? (Nécessite Bibliothèque)</div>}
+                            )}
 
-                            {canFightMercenary ? (
+                            {canFightMercenary && (
                                 <div onClick={() => { if(day > (bossCooldowns.BOSS_MERCENARY || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.MERCENARY, type: 'BOSS_MERCENARY', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_MERCENARY || 0) ? 'opacity-50 cursor-not-allowed' : 'border-red-500 bg-red-900/10 hover:bg-red-900/20'}`}>
                                     <h3 className="font-bold text-red-400">Le Mercenaire</h3>
                                     <p className="text-xs text-slate-400">Armée seulement.</p>
                                 </div>
-                            ) : <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? ({gameStats.conflicts}/4 Conflits)</div>}
+                            )}
 
-                            {canFightWanderer && !gameStats.bossesKilled.includes('BOSS_WANDERER') ? (
+                            {canFightWanderer && !gameStats.bossesKilled.includes('BOSS_WANDERER') && (
                                 <div onClick={() => { if(day > (bossCooldowns.BOSS_WANDERER || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.WANDERER, type: 'BOSS_WANDERER', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_WANDERER || 0) ? 'opacity-50 cursor-not-allowed' : 'border-amber-500 bg-amber-900/10'}`}>
                                     <h3 className="font-bold text-amber-400">Le Vagabond</h3>
                                 </div>
-                            ) : !gameStats.bossesKilled.includes('BOSS_WANDERER') ? <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? ({gameStats.refused}/5 Refus)</div> : null}
+                            )}
 
                             {/* BOSS FINAL */}
                             {showTraitor && (

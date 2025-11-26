@@ -23,15 +23,25 @@
     </script>
 
     <style>
-        /* Petit fix pour éviter le scrollbar moche sur certains navigateurs */
-        ::-webkit-scrollbar { width: 8px; }
+        /* Scrollbar stylisée pour Webkit (Chrome, Safari) */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
-        body { overflow: hidden; } 
+        
+        /* FIX MOBILE: On autorise le scroll sur le body par défaut */
+        body { 
+            overflow-x: hidden; /* Évite le scroll horizontal accidentel */
+            background-color: #0f172a;
+        }
+        
+        /* FIX DESKTOP: On bloque le scroll global seulement sur les grands écrans */
+        @media (min-width: 768px) {
+            body { overflow: hidden; }
+        }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 h-screen w-screen overflow-hidden">
+<body class="text-slate-100">
     <div id="root" class="h-full w-full"></div>
 
     <!-- 4. LE CODE DU JEU -->
@@ -139,8 +149,7 @@
         const DAY_DURATION = 20000; 
         const CONSTRUCTION_TIME = 20000; 
 
-        // --- HELPER FUNCTIONS (MOVED OUTSIDE TO FIX SCOPE ISSUES) ---
-
+        // --- FONCTIONS UTILITAIRES (HORS DU COMPOSANT POUR SCOPE) ---
         const formatTime = (ms) => `${Math.ceil(ms / 1000)}s`;
 
         const getReputationLabel = (rep) => { 
@@ -211,7 +220,7 @@
         };
 
 
-        // --- MAIN COMPONENT ---
+        // --- COMPOSANT PRINCIPAL ---
 
         function VillageManager() {
             const [view, setView] = useState('DASHBOARD'); 
@@ -233,7 +242,7 @@
             const [bossCooldowns, setBossCooldowns] = useState({});
 
             const [villages, setVillages] = useState([]); 
-            const [logs, setLogs] = useState([{ day: 1, text: "Bienvenue, Seigneur de Guerre." }]);
+            const [logs, setLogs] = useState([{ day: 1, text: "Bienvenue, Monsieur le Maire." }]); // Message modifié ici
             const [notifications, setNotifications] = useState([]); 
             const [currentEvent, setCurrentEvent] = useState(null);
 

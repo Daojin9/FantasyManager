@@ -139,6 +139,80 @@
         const DAY_DURATION = 20000; 
         const CONSTRUCTION_TIME = 20000; 
 
+        // --- HELPER FUNCTIONS (MOVED OUTSIDE TO FIX SCOPE ISSUES) ---
+
+        const formatTime = (ms) => `${Math.ceil(ms / 1000)}s`;
+
+        const getReputationLabel = (rep) => { 
+            if (rep >= 80) return { text: "Allié", color: "text-green-400" }; 
+            if (rep <= 20) return { text: "Ennemi", color: "text-red-500" }; 
+            return { text: "Neutre", color: "text-slate-400" }; 
+        };
+
+        const determineClass = (stats) => {
+            const sorted = Object.entries(stats).sort(([,a], [,b]) => b - a);
+            const [s1, s2] = [sorted[0][0], sorted[1][0]];
+            if (s1 === 'STR' && s2 === 'AGI') return 'ASSASSIN';
+            if (s1 === 'VIT' && s2 === 'STR') return 'BERSERKER';
+            if (s1 === 'AGI' && s2 === 'END') return 'TRAPPER';
+            if (s1 === 'AGI' && s2 === 'STR') return 'ARCHER';
+            if (s1 === 'STR') return 'WARRIOR';
+            if (s1 === 'AGI') return 'SNIPER';
+            if (s1 === 'END') return 'RUNNER';
+            if (s1 === 'VIT') return 'PROTECTOR';
+            return 'WARRIOR';
+        };
+
+        const getSynergyAnalysis = (squad) => {
+            let roles = { TANK: 0, FRONTLINE: 0, BACKLINE: 0, SUPPORT: 0, DPS: 0, CIVIL: 0 };
+            squad.forEach(h => {
+                const role = CLASSES[h.classType].role;
+                roles[role] = (roles[role] || 0) + 1;
+                if (role === 'TANK') roles.FRONTLINE++;
+            });
+            let warnings = [];
+            let bonuses = [];
+            let defenseMod = 0;
+            let powerBonus = 0;
+            let timeBonus = false;
+
+            if (roles.FRONTLINE === 0 && roles.TANK === 0) {
+                warnings.push("PAS DE FRONTLINE (-4 Def)");
+                defenseMod -= 4;
+            } else if (roles.TANK > 0) {
+                bonuses.push("TANK (+2 Def)");
+                defenseMod += 2;
+            }
+            if (roles.DPS >= 2) {
+                bonuses.push("INFILTRATION (-20% Temps)");
+                timeBonus = true;
+            }
+            if (roles.BACKLINE >= 2) {
+                bonuses.push("TIR DE SOUTIEN (+15 Att)");
+                powerBonus = 15;
+            }
+            if (roles.BACKLINE > 3) warnings.push("TROP D'ARCHERS");
+            if (roles.SUPPORT > 0) bonuses.push("SOUTIEN (Soins)");
+
+            return { defenseMod, warnings, bonuses, powerBonus, timeBonus };
+        };
+
+        const getHeroPower = (hero) => {
+            let power = hero.stats.STR + hero.stats.AGI + (hero.level * 3);
+            if (hero.item) {
+                if (hero.item.stat === 'ALL') power += hero.item.val * 2;
+                else if (hero.item.stat === 'STR' || hero.item.stat === 'AGI') power += hero.item.val;
+                else if (hero.item.stat === 'SPECIAL') { 
+                    power += 2;
+                }
+            }
+            if (hero.socialTrait && hero.socialTrait.powerBonus) power += hero.socialTrait.powerBonus; 
+            return power;
+        };
+
+
+        // --- MAIN COMPONENT ---
+
         function VillageManager() {
             const [view, setView] = useState('DASHBOARD'); 
             const [gameState, setGameState] = useState('PLAYING'); 
@@ -480,15 +554,6 @@
 
             const resolvePillage = (mission) => {
                 const village = villages.find(v => v.id === mission.targetVillageId);
-                // FIX: launchPillage passes village in targetVillageId properly?
-                // Actually launchPillage logic uses target.id. Here we find by id.
-                // IMPORTANT: In launchPillage we stored targetVillageId. 
-                // Villages state might have changed? Usually ok unless deleted.
-                if (!village && mission.type === 'RAZE') { 
-                    // Village might be gone if logic already deleted it? No, we delete on success.
-                    // But if multiple pillages...
-                }
-                
                 const squad = roster.filter(h => mission.heroes.includes(h.id));
                 const teamPower = squad.reduce((sum, h) => sum + getHeroPower(h), 0);
                 const success = (Math.random() * 40) + teamPower > 140; 
@@ -916,7 +981,7 @@
                                 <div className="text-xs text-slate-400 mb-2">{m.desc}</div>
                                 <div className="text-xs font-mono text-amber-500 flex justify-between">
                                     <span>RISQUE: {m.risk}</span>
-                                    <span>DIFF: {m.difficulty}</span>
+                                    <span>RECOMPENSE: {m.reward === 'GOLD' ? 'OR' : m.reward === 'TAX' ? 'SÉCURITÉ' : 'MATÉRIAUX'}</span>
                                 </div>
                             </div>
                             ))}
@@ -1167,6 +1232,9 @@
                 </div>
             );
         }
+        
+        const root = createRoot(document.getElementById('root'));
+        root.render(<VillageManager />);
     </script>
 </body>
 </html>

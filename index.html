@@ -1,0 +1,1165 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Sword, Shield, Activity, Wind, UserPlus, ChevronUp, Scroll, Skull, Coins, HeartPulse, Tent, AlertTriangle, Cross, Star, Hammer, Home, Users, Clock, CheckCircle, Sun, Moon, Flag, MessageSquare, Map, Handshake, Globe, Flame, Swords, Book, Gem, Trophy, Crown, Info, DollarSign, ShoppingBag, Anvil, UserMinus } from 'lucide-react';
+
+// --- CONFIGURATION DU JEU ---
+
+const SUB_CLASSES = {
+  WARRIOR: ['Commandant', 'Maître d\'Armes', 'Bélier'],
+  ASSASSIN: ['Contrôleur', 'Tueur', 'Ombre'],
+  SNIPER: ['Assaut', 'Saboteur', 'Fantôme'],
+  RUNNER: ['Évasion', 'Guérisseur', 'Poursuivant'],
+  PROTECTOR: ['Vindicateur', 'Soutien', 'Lancier'],
+  BERSERKER: ['Buveur de Sang', 'Ravageur', 'Régénérateur'],
+  TRAPPER: ['Pisteur', 'Maître-Chiens', 'Ingénieur'],
+  ARCHER: ['Traqueur', 'Modérateur', 'Sentinelle'],
+};
+
+const CLASSES = {
+  UNKNOWN: { name: 'Recrue', color: 'text-gray-400', role: 'CIVIL' },
+  WARRIOR: { name: 'Guerrier', color: 'text-red-500', role: 'FRONTLINE' },
+  ASSASSIN: { name: 'Assassin', color: 'text-purple-500', role: 'DPS' },
+  SNIPER: { name: 'Tireur', color: 'text-yellow-500', role: 'BACKLINE' },
+  RUNNER: { name: 'Voltigeur', color: 'text-cyan-400', role: 'SUPPORT' },
+  PROTECTOR: { name: 'Garde', color: 'text-blue-600', role: 'TANK' },
+  BERSERKER: { name: 'Berserker', color: 'text-orange-600', role: 'FRONTLINE' },
+  TRAPPER: { name: 'Chasseur', color: 'text-lime-500', role: 'BACKLINE' },
+  ARCHER: { name: 'Archer', color: 'text-emerald-500', role: 'BACKLINE' },
+};
+
+const LEVEL_STYLES = {
+  1: { border: 'border-slate-600', bg: 'bg-slate-800' },
+  2: { border: 'border-green-700', bg: 'bg-green-900/10' },
+  3: { border: 'border-blue-700', bg: 'bg-blue-900/10' },
+  4: { border: 'border-purple-700', bg: 'bg-purple-900/10' },
+  5: { border: 'border-yellow-400', bg: 'bg-yellow-900/20', shadow: 'shadow-[0_0_15px_rgba(250,204,21,0.4)]' },
+};
+
+const SOCIAL_TRAITS = [
+  { name: 'Célébrité', desc: '+1 Sécu/j', effect: (s) => ({ ...s, security: s.security + 1 }) },
+  { name: 'Modeste', desc: 'Salaire -50%', wageMod: 0.5 },
+  { name: 'Corrompu', desc: '-10 Or/j', effect: (s) => ({ ...s, gold: s.gold - 10 }) },
+  { name: 'Instructeur', desc: '+1 XP Passif', passiveXp: true },
+  { name: 'Syndicaliste', desc: 'Salaire +50%', wageMod: 1.5 },
+  { name: 'Diplomate', desc: 'Bonus Relations', diplomacyBonus: 15 },
+  { name: 'Charognard', desc: 'Trouve des matériaux', matBonus: 2 },
+  { name: 'Fanatique', desc: '+5 Force vs Ennemis', powerBonus: 5 },
+];
+
+const RELICS_DATA = [
+  { id: 'ring_vit', name: 'Anneau de Vie', stat: 'VIT', val: 2, rarity: 1, desc: 'Un anneau vibrant de vie.' },
+  { id: 'sword_str', name: 'Épée Rouillée', stat: 'STR', val: 2, rarity: 1, desc: 'Vielle mais efficace.' },
+  { id: 'boots_agi', name: 'Bottes Elfiques', stat: 'AGI', val: 2, rarity: 1, desc: 'Légères comme une plume.' },
+  { id: 'shield_end', name: 'Pavois Lourd', stat: 'END', val: 2, rarity: 1, desc: 'Encaisse les coups durs.' },
+  { id: 'amulet_all', name: 'Cœur de Dragon', stat: 'ALL', val: 1, rarity: 2, desc: 'Une puissance antique.' },
+];
+
+const BOSS_LOOT = {
+  WITCH: { id: 'staff_witch', name: 'Bâton Maudit', stat: 'SPECIAL', val: 4, desc: '+4 VIT/AGI, -2 STR/END.' },
+  MERCENARY: { id: 'axe_merc', name: 'Hache du Bourreau', stat: 'STR', val: 5, desc: 'Tranche les os sans effort.' },
+  WANDERER: { id: 'cloak_shadow', name: 'Cape des Ombres', stat: 'AGI', val: 5, desc: 'Rend invisible la nuit.' },
+  TRAITOR: { id: 'crown_king', name: 'Couronne du Roi', stat: 'ALL', val: 5, desc: 'Symbole de victoire.' },
+};
+
+const BUILDINGS_DATA = {
+  MAYOR_HOUSE: { name: 'Manoir du Maire', cost: 1000, maxLvl: 3, desc: 'Si détruit (Niv 0), c\'est la DÉFAITE.', icon: Crown },
+  HOUSING: { name: 'Habitations', cost: 150, maxLvl: 5, desc: 'Augmente la limite de population (+5 places/niv).' },
+  BARRACKS: { name: 'Caserne', cost: 150, maxLvl: 3, desc: 'Centre d\'entraînement. Augmente les chances de Level Up (+10%/niv).' },
+  HOSPITAL: { name: 'Infirmerie', cost: 100, maxLvl: 3, desc: 'Soins intensifs. Réduit la durée des blessures.' },
+  BANK: { name: 'Banque', cost: 400, maxLvl: 3, desc: 'Augmente les impôts de 20%/niv.' },
+  FORGE: { name: 'Forge', cost: 500, maxLvl: 3, desc: '+1 Force/Agilité global par niveau.' },
+  MERC_GUILD: { name: 'Guilde Mercenaires', cost: 200, maxLvl: 1, desc: 'Permet de revendre des contrats de héros (5 Or x Niveau).', icon: DollarSign },
+  ARTISAN_GUILD: { name: 'Guilde Artisans', cost: 300, maxLvl: 1, desc: 'Permet de fabriquer des objets (20 Matériaux).', icon: Anvil },
+  LIBRARY: { name: 'Bibliothèque', cost: 1000, maxLvl: 1, desc: 'Savoir ancien. Débloque la quête de la Sorcière.', hidden: true },
+  VAGABOND_SHOP: { name: 'Échoppe Vagabond', cost: 500, maxLvl: 1, desc: 'Marché noir. Achat de matériaux et sécurité.', hidden: true, icon: ShoppingBag },
+};
+
+const MISSION_TYPES = [
+  { type: 'SECURITY', label: 'Patrouille', risk: 'FAIBLE', reward: 'TAX', duration: 5000, desc: 'Rapide. Initiation.', difficulty: 40 }, 
+  { type: 'HUNT', label: 'Chasse', risk: 'MOYEN', reward: 'MATS', duration: 15000, desc: 'Récupère Or et Matériaux.', difficulty: 80 }, 
+  { type: 'DUNGEON', label: 'Donjon', risk: 'ÉLEVÉ', reward: 'GOLD', duration: 30000, desc: 'Long & Mortel. Chance de butin.', difficulty: 120 }, 
+];
+
+const BOSS_MISSIONS = {
+  WITCH: { id: 'BOSS_WITCH', label: 'La Sorcière', desc: 'Boss Magique. Nécessite Bibliothèque.', powerReq: 160, loot: 'WITCH' },
+  MERCENARY: { id: 'BOSS_MERCENARY', label: 'Le Mercenaire', desc: 'Armée Complète requise (10).', powerReq: 360, loot: 'MERCENARY' }, 
+  WANDERER: { id: 'BOSS_WANDERER', label: 'Le Vagabond', desc: 'Combat Unique.', powerReq: 180, loot: 'WANDERER' }, 
+  TRAITOR: { id: 'BOSS_TRAITOR', label: 'Le Traître', desc: 'DUEL FINAL. Tuez le pour gagner.', powerReq: 50, loot: 'TRAITOR' },
+};
+
+const VILLAGE_NAMES = ['Royaume de Pierre', 'Enclave Elfique', 'Maraudeurs du Nord', 'Cité Marchande', 'Tribus Sauvages', 'Ordre Sacré'];
+const NAMES_PREFIX = ['Ald', 'Thal', 'Bor', 'Kael', 'Dra', 'Fen', 'Gor', 'Ly', 'Syl', 'Mor'];
+const NAMES_SUFFIX = ['ric', 'or', 'ian', 'en', 'gar', 'ndor', 'thos', 'wyn', 'mir', 'las'];
+const LAST_NAMES = ['Ironfoot', 'Stormwind', 'Blackthorn', 'Swiftblade', 'Oakenshield', 'Darkwater', 'Lightbringer', 'Shadowstep'];
+
+const DAY_DURATION = 20000; 
+const CONSTRUCTION_TIME = 20000; 
+
+export default function VillageManager() {
+  const [view, setView] = useState('DASHBOARD'); 
+  const [gameState, setGameState] = useState('PLAYING'); 
+  const [day, setDay] = useState(1);
+  const [dayProgress, setDayProgress] = useState(0); 
+  const [gold, setGold] = useState(400);
+  const [materials, setMaterials] = useState(0); 
+  const [security, setSecurity] = useState(50);
+  
+  const [roster, setRoster] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [buildings, setBuildings] = useState({ MAYOR_HOUSE: 1, HOUSING: 0, BARRACKS: 0, HOSPITAL: 0, BANK: 0, FORGE: 0, MERC_GUILD: 0, ARTISAN_GUILD: 0, LIBRARY: 0, VAGABOND_SHOP: 0 });
+  const [construction, setConstruction] = useState(null); 
+  
+  // Timer pour l'échoppe du vagabond
+  const [lastVagabondPurchaseDay, setLastVagabondPurchaseDay] = useState(-10); 
+
+  const [gameStats, setGameStats] = useState({ dungeons: 0, conflicts: 0, refused: 0, bossesKilled: [], deadCount: 0 });
+  const [bossCooldowns, setBossCooldowns] = useState({});
+
+  const [villages, setVillages] = useState([]); 
+  const [logs, setLogs] = useState([{ day: 1, text: "Bienvenue, Seigneur de Guerre." }]);
+  const [notifications, setNotifications] = useState([]); 
+  const [currentEvent, setCurrentEvent] = useState(null);
+
+  const [activeMissions, setActiveMissions] = useState([]); 
+  const [now, setNow] = useState(Date.now()); 
+  
+  const [selectedMissionType, setSelectedMissionType] = useState(null);
+  const [selectedHeroes, setSelectedHeroes] = useState([]);
+  const [diplomacyTarget, setDiplomacyTarget] = useState(null); 
+  const [army, setArmy] = useState([]); 
+
+  useEffect(() => {
+    if (currentEvent || gameState !== 'PLAYING') return; 
+
+    const interval = setInterval(() => {
+      const currentTime = Date.now();
+      setNow(currentTime);
+      
+      setDayProgress(prev => {
+        const next = prev + (1000 / DAY_DURATION * 100);
+        if (next >= 100) { triggerNextDay(); return 0; }
+        return next;
+      });
+
+      checkMissionCompletions();
+      checkHealingCompletions();
+      checkConstructionCompletion(currentTime);
+
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [roster, activeMissions, buildings, security, gold, day, currentEvent, villages, army, gameStats, bossCooldowns, gameState, construction]); 
+
+  useEffect(() => {
+      if (gameState !== 'PLAYING') return;
+      if (buildings.MAYOR_HOUSE === 0) setGameState('DEFEAT_HOUSE');
+      if (gameStats.deadCount >= 10) setGameState('DEFEAT_DEAD');
+  }, [buildings.MAYOR_HOUSE, gameStats.deadCount, gameState]);
+
+  const addLog = (text) => setLogs(prev => [{ day, text }, ...prev].slice(0, 10));
+
+  const addNotification = (title, type) => {
+    const id = Date.now() + Math.random(); 
+    setNotifications(prev => [...prev, { id, title, type }]);
+    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 5000);
+  };
+
+  const checkConstructionCompletion = (time) => {
+      if (construction && time >= construction.endTime) {
+          const key = construction.key;
+          setBuildings(prev => ({ ...prev, [key]: prev[key] + 1 }));
+          addNotification(`Construction terminée : ${BUILDINGS_DATA[key].name}`, 'success');
+          setConstruction(null);
+      }
+  };
+
+  const triggerNextDay = () => {
+    const bankBonus = 1 + (buildings.BANK * 0.2); 
+    const baseTax = Math.floor(50 * (security / 50)); 
+    let finalTax = Math.floor(baseTax * bankBonus);
+    
+    roster.forEach(h => { if (h.socialTrait && h.socialTrait.name === 'Corrompu') finalTax -= 10; });
+    setGold(g => Math.max(0, g + finalTax)); 
+    
+    setSecurity(s => {
+        let change = -5; 
+        roster.forEach(h => { if (h.status !== 'DEAD' && h.socialTrait && h.socialTrait.name === 'Célébrité') change += 1; });
+        const enemies = villages.filter(v => v.reputation <= 20).length;
+        if (enemies > 0) { change -= (enemies * 3); addLog(`SÉCURITÉ : -${enemies*3}% (Sabotage ennemi)`); }
+        return Math.min(100, Math.max(0, s + change));
+    });
+
+    let newVillages = [...villages];
+    const maxVillagesAllowed = Math.floor(day / 7) + 1; 
+    
+    if (newVillages.length < 5 && newVillages.length < maxVillagesAllowed) {
+        let chance = 0.1 + (day * 0.005); 
+        if (newVillages.length === 0 && day > 8) chance = 1.0; 
+
+        if (Math.random() < chance) {
+            const nameAvailable = VILLAGE_NAMES.filter(n => !newVillages.find(v => v.name === n));
+            if (nameAvailable.length > 0) {
+                const newName = nameAvailable[Math.floor(Math.random() * nameAvailable.length)];
+                newVillages.push({ id: Date.now() + Math.random(), name: newName, reputation: 50, isTraitor: false });
+                addNotification(`Contact établi : ${newName}`, 'success');
+            }
+        }
+    }
+
+    newVillages.forEach(v => {
+        if (v.isTraitor) return; 
+        if (v.reputation > 50) v.reputation -= 1; 
+        if (v.reputation < 50) v.reputation += 1;
+        if (v.reputation <= 20 && Math.random() < 0.4) handleEnemyRaid(v);
+    });
+    setVillages(newVillages);
+
+    setDay(d => { addLog(`Fin Jour ${d}: +${finalTax} Or.`); return d + 1; });
+
+    if (Math.random() < 0.35 && newVillages.length > 0) {
+        triggerDynamicEvent(newVillages, activeMissions);
+    }
+  };
+
+  const handleEnemyRaid = (enemyVillage) => {
+      const raidPower = 60 + (day * 4); 
+      const armyPower = army.reduce((sum, heroId) => {
+          const hero = roster.find(h => h.id === heroId);
+          return hero && hero.status !== 'DEAD' ? sum + getHeroPower(hero) : sum;
+      }, 0);
+
+      const alliesCount = villages.filter(v => v.reputation >= 80).length;
+      const allyBonus = alliesCount * 30; 
+      const totalDefense = armyPower + allyBonus;
+      const defenseRoll = Math.random() * totalDefense;
+      const attackRoll = Math.random() * raidPower;
+
+      if (defenseRoll >= attackRoll) {
+          addNotification(`Raid de ${enemyVillage.name} repoussé !`, 'success');
+          setGameStats(prev => ({ ...prev, conflicts: prev.conflicts + 1 })); 
+      } else {
+          const secLoss = Math.floor(Math.random() * 20) + 10;
+          setSecurity(s => Math.max(0, s - secLoss));
+          
+          const buildingKeys = Object.keys(buildings).filter(k => buildings[k] > 0);
+          if (buildingKeys.length > 0) {
+              const randomKey = buildingKeys[Math.floor(Math.random() * buildingKeys.length)];
+              setBuildings(prev => ({ ...prev, [randomKey]: Math.max(0, prev[randomKey] - 1) }));
+              addNotification(`INCENDIE ! ${BUILDINGS_DATA[randomKey].name} endommagé.`, 'error');
+          } else {
+              addNotification(`Le village a été pillé par ${enemyVillage.name} !`, 'error');
+          }
+          setRoster(prev => prev.map(h => {
+              if (h.status === 'IDLE' && h.item && Math.random() < 0.3) {
+                  addLog(`VOL : ${h.name} a perdu ${h.item.name} pendant le raid !`);
+                  return { ...h, item: null };
+              }
+              return h;
+          }));
+      }
+  };
+
+  const triggerDynamicEvent = (currentVillages, currentMissions) => {
+      const availableTargets = currentVillages.filter(v => !v.isTraitor && !currentMissions.some(m => m.targetVillageId === v.id));
+      if (availableTargets.length === 0) return;
+
+      const target = availableTargets[Math.floor(Math.random() * availableTargets.length)];
+      setCurrentEvent({
+          title: `Ultimatum de ${target.name}`,
+          text: `"${target.name}" exige un tribut.`,
+          choices: [
+              { label: 'Payer (100 Or)', cost: 100, effect: () => changeReputation(target.id, 10, -100) },
+              { label: 'Refuser (Risque Guerre)', cost: 0, action: 'REFUSE', effect: () => {
+                  changeReputation(target.id, -20, 0);
+                  setGameStats(s => ({ ...s, refused: s.refused + 1 }));
+              }}
+          ]
+      });
+  };
+
+  const handleEventChoice = (choice) => {
+      if (gold < choice.cost) { addNotification("Pas assez d'or !", "error"); return; }
+      if (choice.effect) choice.effect();
+      setCurrentEvent(null);
+  };
+
+  const changeReputation = (villageId, amount, goldCost) => {
+      setGold(g => Math.max(0, g + goldCost)); 
+      setVillages(prev => prev.map(v => v.id === villageId && !v.isTraitor ? { ...v, reputation: Math.min(100, Math.max(0, v.reputation + amount)) } : v));
+  };
+
+  const triggerTraitorEvent = () => {
+      const strongest = [...roster].sort((a, b) => getHeroPower(b) - getHeroPower(a))[0];
+      if (!strongest) return;
+
+      addLog(`TRAHISON ! ${strongest.name} a quitté le village avec ses partisans !`);
+      addNotification("TRAHISON MAJEURE !", "error");
+
+      sellHero(strongest.id); 
+      setGold(g => g - (strongest.level * 5)); 
+
+      setVillages(prev => [...prev, { id: Date.now() + Math.random(), name: "Bastion du Traître", reputation: 0, isTraitor: true }]);
+  };
+
+  const generateLoot = (rarityBonus = 0) => {
+      if (Math.random() > (0.2 + rarityBonus)) return null;
+      return RELICS_DATA[Math.floor(Math.random() * RELICS_DATA.length)];
+  };
+
+  const craftRelic = () => {
+      if (gold < 50 || materials < 20) { addNotification("Ressources insuffisantes (50 Or, 20 Mat).", "error"); return; }
+      setGold(g => g - 50);
+      setMaterials(m => m - 20);
+      const loot = RELICS_DATA[Math.floor(Math.random() * RELICS_DATA.length)];
+      setInventory(prev => [...prev, loot]);
+      addNotification("Objet fabriqué !", "success");
+  };
+
+  const buyMaterial = () => {
+      if (gold < 50) return;
+      if (day < lastVagabondPurchaseDay + 7) {
+          addNotification("Le Vagabond n'a plus de stock pour le moment.", "error");
+          return;
+      }
+      setGold(g => g - 50);
+      setMaterials(m => m + 5);
+      setLastVagabondPurchaseDay(day);
+      addNotification("Matériaux achetés.", "success");
+  };
+
+  const equipItem = (heroId, itemIndex) => {
+      const itemToEquip = inventory[itemIndex];
+      const newInventory = [...inventory];
+      newInventory.splice(itemIndex, 1); 
+      setRoster(prev => prev.map(h => {
+          if (h.id === heroId) {
+              if (h.item) newInventory.push(h.item); 
+              return { ...h, item: itemToEquip };
+          }
+          return h;
+      }));
+      setInventory(newInventory);
+  };
+
+  const unequipItem = (heroId) => {
+      setRoster(prev => prev.map(h => {
+          if (h.id === heroId && h.item) {
+              setInventory(inv => [...inv, h.item]);
+              return { ...h, item: null };
+          }
+          return h;
+      }));
+  };
+
+  const checkMissionCompletions = () => {
+    const finishedMissions = activeMissions.filter(m => m.startTime + m.duration <= Date.now());
+    if (finishedMissions.length > 0) {
+      setActiveMissions(prev => prev.filter(m => m.startTime + m.duration > Date.now()));
+      finishedMissions.forEach(mission => resolveMission(mission));
+    }
+  };
+
+  const resolveMission = (mission) => {
+    if (mission.type === 'DIPLOMACY') { resolveDiplomacy(mission); return; }
+    if (mission.type === 'PILLAGE' || mission.type === 'RAZE') { resolvePillage(mission); return; }
+    
+    const isBoss = mission.type.startsWith('BOSS');
+    const missionData = isBoss ? Object.values(BOSS_MISSIONS).find(b => b.id === mission.type) : MISSION_TYPES.find(m => m.type === mission.type);
+    const squad = roster.filter(h => mission.heroes.includes(h.id));
+    
+    // AUTO SQUAD FOR MERCENARY BOSS IF ARMY USED
+    const finalSquad = (mission.type === 'BOSS_MERCENARY') ? roster.filter(h => army.includes(h.id)) : squad;
+
+    const synergy = getSynergyAnalysis(finalSquad);
+    const forgeBonus = buildings.FORGE * 2; 
+    const teamPower = finalSquad.reduce((sum, h) => sum + getHeroPower(h), 0) + (forgeBonus * finalSquad.length) + (synergy.powerBonus || 0);
+    
+    let difficulty = missionData.difficulty || 25;
+    if (isBoss) difficulty = missionData.powerReq;
+
+    const roll = (Math.random() * 30) + teamPower;
+    const missionSuccess = roll > difficulty;
+
+    let goldReward = 0;
+    let securityReward = 0;
+    let matReward = 0;
+
+    if (missionSuccess) {
+      if (missionData.type === 'SECURITY') securityReward = 15;
+      else if (!isBoss) {
+        const baseGold = missionData.risk === 'HIGH' ? 200 : 100; 
+        goldReward = Math.floor(Math.random() * baseGold) + baseGold;
+        if (missionData.reward === 'MATS') matReward = Math.floor(Math.random() * 3) + 2;
+      }
+      
+      if (isBoss) {
+          addNotification(`BOSS VAINCU : ${missionData.label} !`, 'success');
+          addLog(`VICTOIRE ÉPIQUE contre ${missionData.label}.`);
+          setBossCooldowns(prev => ({ ...prev, [mission.type]: day + 7 }));
+          
+          if (mission.type === 'BOSS_TRAITOR') {
+              setGameState('VICTORY'); 
+              return;
+          }
+
+          if (!gameStats.bossesKilled.includes(mission.type)) {
+              const uniqueLoot = BOSS_LOOT[missionData.loot];
+              setInventory(prev => [...prev, uniqueLoot]);
+              setGameStats(prev => ({ ...prev, bossesKilled: [...prev.bossesKilled, mission.type] }));
+              addNotification(`Objet Légendaire obtenu : ${uniqueLoot.name}`, 'success');
+              
+              if (mission.type === 'BOSS_MERCENARY') triggerTraitorEvent();
+              if (mission.type === 'BOSS_WANDERER') addLog("Vous avez gagné le respect du Vagabond. Son échoppe est disponible.");
+
+          } else {
+              const standardLoot = generateLoot(0.5); 
+              if (standardLoot) setInventory(prev => [...prev, standardLoot]);
+              goldReward = 500; 
+          }
+      } else {
+          addNotification(`Mission ${missionData.label} Réussie !`, 'success');
+          if (missionData.type === 'DUNGEON') {
+              setGameStats(prev => ({ ...prev, dungeons: prev.dungeons + 1 }));
+              const loot = generateLoot(0);
+              if (loot) {
+                  setInventory(prev => [...prev, loot]);
+                  addLog(`Trésor trouvé : ${loot.name}`);
+              }
+          }
+      }
+    } else {
+      securityReward = -5;
+      addNotification(`Échec de la mission ${missionData.label}...`, 'error');
+    }
+
+    const risk = isBoss ? 'HIGH' : missionData.risk;
+    updateRosterPostMission(finalSquad.map(h=>h.id), missionSuccess, missionData.type === 'SECURITY' ? 'SAFE' : risk, synergy, securityReward, goldReward, matReward, isBoss ? "Boss" : "Mission", mission.type);
+  };
+
+  const resolvePillage = (mission) => {
+      const village = villages.find(v => v.id === mission.targetVillageId);
+      const squad = roster.filter(h => mission.heroes.includes(h.id));
+      const teamPower = squad.reduce((sum, h) => sum + getHeroPower(h), 0);
+      const success = (Math.random() * 40) + teamPower > 140; 
+
+      if (success) {
+          if (mission.type === 'RAZE') {
+              addNotification(`BASTION DU TRAÎTRE RASÉ !`, 'success');
+              addLog(`VICTOIRE : Le repaire du traître est en cendres.`);
+              setVillages(prev => prev.filter(v => v.id !== village.id));
+          } else {
+              const goldLoot = Math.floor(Math.random() * 300) + 300;
+              addNotification(`PILLAGE RÉUSSI : ${village.name} mis à sac !`, 'success');
+              setGold(g => g + goldLoot);
+              changeReputation(village.id, -100, 0);
+              setGameStats(prev => ({ ...prev, conflicts: prev.conflicts + 1 })); 
+              const loot = generateLoot(-0.1);
+              if (loot) setInventory(prev => [...prev, loot]);
+          }
+      } else {
+          addNotification(`ATTAQUE ÉCHOUÉE.`, 'error');
+          if (mission.type !== 'RAZE') changeReputation(village.id, -100, 0);
+      }
+      updateRosterPostMission(mission.heroes, success, 'HIGH', { defenseMod: 0 }, 0, 0, 0, mission.type === 'RAZE' ? "Siège" : "Pillage");
+  };
+
+  const resolveDiplomacy = (mission) => {
+      const hero = roster.find(h => h.id === mission.heroes[0]);
+      const village = villages.find(v => v.id === mission.targetVillageId);
+      let influence = 5 + (hero.level * 2);
+      if (hero.socialTrait && hero.socialTrait.name === 'Diplomate') influence += 15;
+      const success = Math.random() > 0.1;
+      if (success) {
+          addNotification(`Succès diplomatique : ${village.name}`, 'success');
+          changeReputation(village.id, influence, 0);
+      } else {
+          addNotification(`Incident diplomatique avec ${village.name} !`, 'error');
+          changeReputation(village.id, -15, 0);
+      }
+      updateRosterPostMission([hero.id], true, 'SAFE', { defenseMod: 10 }, 0, 0, 0, "Diplomatie");
+  };
+
+  const updateRosterPostMission = (heroIds, success, riskLevel, synergy, secRew, goldRew, matRew, context, missionType = '') => {
+    setRoster(prevRoster => {
+      let updatedRoster = prevRoster.map(hero => {
+        if (!heroIds.includes(hero.id)) return hero;
+        
+        // LEVEL CAP CHECK
+        let canLevelUp = true;
+        if (missionType === 'SECURITY' && hero.level >= 3) canLevelUp = false;
+        if (missionType === 'HUNT' && hero.level >= 4) canLevelUp = false;
+
+        if (riskLevel === 'SAFE') return levelUpHero(hero, success, canLevelUp); 
+
+        const situationMod = success ? 5 : -5;
+        let itemBonus = 0;
+        if (hero.item) {
+            if (hero.item.stat === 'VIT' || hero.item.stat === 'ALL') itemBonus += hero.item.val;
+            if (hero.item.stat === 'SPECIAL') itemBonus += 4; 
+        }
+
+        const totalDefense = hero.stats.VIT + hero.stats.END + synergy.defenseMod + buildings.FORGE + situationMod + itemBonus;
+        const survivalRoll = (Math.random() * 20) + totalDefense;
+
+        let deathThreshold = riskLevel === 'HIGH' ? 10 : 2;
+        if (context !== 'Mission' || riskLevel === 'HIGH') {
+             if (CLASSES[hero.classType].role !== 'TANK' && CLASSES[hero.classType].role !== 'FRONTLINE' && synergy.defenseMod < 0) deathThreshold += 4; 
+        }
+        
+        if (context === 'Boss' && success === false) deathThreshold += 5;
+
+        if (survivalRoll < deathThreshold) {
+          let deathReason = "";
+          if (context === "Pillage" || context === "Siège") deathReason = "Tué par la garde du village";
+          else if (context === "Boss") deathReason = "Massacré par un Boss";
+          else deathReason = "Tué au combat (Mission)";
+          
+          addLog(`☠️ ${hero.name} : ${deathReason}`);
+          setGameStats(prev => ({ ...prev, deadCount: prev.deadCount + 1 }));
+          
+          setArmy(prevArmy => prevArmy.filter(id => id !== hero.id));
+          return { ...hero, status: 'DEAD', deathDay: day, item: null, deathReason: deathReason };
+        }
+
+        if (survivalRoll < (riskLevel === 'HIGH' ? 22 : 12)) {
+            const hospitalFactor = Math.max(0.2, 1 - (buildings.HOSPITAL * 0.25));
+            const duration = (Math.floor(Math.random() * 40) + 20) * 1000 * hospitalFactor;
+            return { ...hero, status: 'INJURED', statusEndTime: Date.now() + duration, history: [...hero.history, `${context} : Blessé`] };
+        }
+        return levelUpHero(hero, success, canLevelUp);
+      });
+      const alive = updatedRoster.filter(h => h.status !== 'DEAD');
+      const dead = updatedRoster.filter(h => h.status === 'DEAD');
+      return [...alive, ...dead.slice(-10)];
+    });
+
+    if (secRew !== 0) setSecurity(s => Math.min(100, Math.max(0, s + secRew)));
+    if (goldRew !== 0 || matRew !== 0) { 
+        setGold(g => g + goldRew); 
+        setMaterials(m => m + matRew);
+        addLog(`Retour: +${goldRew} Or${matRew > 0 ? `, +${matRew} Mat` : ''}`); 
+    }
+  };
+
+  const checkHealingCompletions = () => {
+    const activeHeroes = roster.filter(h => (h.status === 'INJURED' || h.status === 'LENT') && h.statusEndTime <= Date.now());
+    if (activeHeroes.length > 0) {
+      setRoster(prev => prev.map(h => {
+        if ((h.status === 'INJURED' || h.status === 'LENT') && h.statusEndTime <= Date.now()) {
+          return { ...h, status: 'IDLE', statusEndTime: null };
+        }
+        return h;
+      }));
+    }
+  };
+
+  const levelUpHero = (hero, success, canLevelUp = true) => {
+      let newLevel = hero.level;
+      let newStats = { ...hero.stats };
+      let newSocialTrait = hero.socialTrait;
+      let newClass = hero.classType;
+      let newSubClass = hero.subClass;
+
+      // BARRACKS BONUS
+      const barracksBonus = buildings.BARRACKS * 0.1; 
+      const baseChance = success ? 0.6 : 0.1; 
+      
+      if (canLevelUp && success && hero.level < 5 && Math.random() < (baseChance + barracksBonus)) {
+           newLevel++;
+           const keys = Object.keys(newStats);
+           for(let i=0; i<2; i++) newStats[keys[Math.floor(Math.random() * 4)]]++;
+           if (newLevel === 2) newClass = determineClass(newStats);
+           if (newLevel === 4) newSubClass = SUB_CLASSES[newClass][Math.floor(Math.random() * 3)];
+           if (newLevel >= 3 && !newSocialTrait && Math.random() < 0.4) newSocialTrait = SOCIAL_TRAITS[Math.floor(Math.random() * SOCIAL_TRAITS.length)];
+      }
+      return { 
+          ...hero, 
+          level: newLevel, 
+          stats: newStats, 
+          classType: newClass, 
+          subClass: newSubClass,
+          socialTrait: newSocialTrait, 
+          status: 'IDLE', 
+          statusEndTime: null, 
+          history: [...hero.history, success ? "Succès" : "Échec"] 
+      };
+  };
+
+  const getHeroPower = (hero) => {
+      let power = hero.stats.STR + hero.stats.AGI + (hero.level * 3);
+      if (hero.item) {
+          if (hero.item.stat === 'ALL') power += hero.item.val * 2;
+          else if (hero.item.stat === 'STR' || hero.item.stat === 'AGI') power += hero.item.val;
+          else if (hero.item.stat === 'SPECIAL') { 
+              power += 2;
+          }
+      }
+      if (hero.socialTrait && hero.socialTrait.powerBonus) power += hero.socialTrait.powerBonus; 
+      return power;
+  };
+
+  const toggleArmy = (heroId) => {
+      const hero = roster.find(h => h.id === heroId);
+      if (hero.level < 5) { addNotification("Niveau 5 requis.", "error"); return; }
+      if (army.includes(heroId)) setArmy(prev => prev.filter(id => id !== heroId));
+      else { if (army.length >= 10) return; setArmy(prev => [...prev, heroId]); }
+  };
+
+  const sellHero = (heroId) => {
+      const hero = roster.find(h => h.id === heroId);
+      if (!hero) return;
+      if (hero.item) setInventory(inv => [...inv, hero.item]);
+      const price = hero.level * 5;
+      setGold(g => g + price);
+      addLog(`Départ : ${hero.name} vendu pour ${price} Or.`);
+      if (army.includes(heroId)) setArmy(p => p.filter(id => id !== heroId));
+      if (selectedHeroes.includes(heroId)) setSelectedHeroes(p => p.filter(id => id !== heroId));
+      setRoster(prev => prev.filter(h => h.id !== heroId));
+  };
+
+  const launchMission = () => { 
+      if (!selectedMissionType || selectedHeroes.length === 0) {
+          if (selectedMissionType && selectedMissionType.type !== 'BOSS_MERCENARY') return;
+          if (!selectedMissionType) return;
+      }
+
+      if (selectedMissionType.type === 'BOSS_MERCENARY') {
+          if (army.length === 0) { addNotification("Armée requise (Soldats Niv 5) !", "error"); return; }
+      } else if (selectedMissionType.type === 'BOSS_WITCH') {
+          if (buildings.LIBRARY < 1) { addNotification("Bibliothèque requise !", "error"); return; }
+          // Free
+      } else {
+          if (gold < 50) { addNotification("Pas assez d'or (50 requis).", "error"); return; }
+          setGold(g => g - 50); 
+      }
+
+      let squad = roster.filter(h => selectedHeroes.includes(h.id));
+      if (selectedMissionType.type === 'BOSS_MERCENARY') {
+          squad = roster.filter(h => army.includes(h.id) && h.status === 'IDLE');
+          if(squad.length === 0) { addNotification("Armée indisponible (Occupée/Blessée)", "error"); return; }
+      }
+
+      const synergy = getSynergyAnalysis(squad);
+      let duration = selectedMissionType.duration;
+      if (synergy.timeBonus) duration = duration * 0.8; 
+
+      const newMission = { 
+          id: Date.now() + Math.random(), 
+          type: selectedMissionType.type, 
+          heroes: squad.map(h => h.id), 
+          startTime: Date.now(), 
+          duration: duration, 
+          targetVillageId: null 
+      }; 
+      
+      setActiveMissions(prev => [...prev, newMission]); 
+      setRoster(prev => prev.map(h => { 
+          if (squad.find(s => s.id === h.id)) return { ...h, status: 'MISSION', statusEndTime: Date.now() + duration }; 
+          return h; 
+      })); 
+      
+      setSelectedHeroes([]); setSelectedMissionType(null); setView('DASHBOARD'); 
+  };
+
+  const launchDiplomacy = () => { 
+      if (activeMissions.find(m => m.targetVillageId === diplomacyTarget.id)) return; 
+      if (gold < 50) { addNotification("Pas assez d'or (50 requis).", "error"); return; }
+      setGold(g => g - 50); 
+      const newMission = { id: Date.now() + Math.random(), type: 'DIPLOMACY', heroes: selectedHeroes, startTime: Date.now(), duration: 60000, targetVillageId: diplomacyTarget.id }; setActiveMissions(prev => [...prev, newMission]); setRoster(prev => prev.map(h => { if (selectedHeroes.includes(h.id)) return { ...h, status: 'MISSION', statusEndTime: Date.now() + 60000 }; return h; })); setDiplomacyTarget(null); setSelectedHeroes([]); 
+  };
+  
+  const launchPillage = (targetVillage = null) => { 
+      const target = targetVillage || diplomacyTarget;
+      if (!target) return;
+      
+      if (gold < 100) { addNotification("Pas assez d'or (100 requis).", "error"); return; }
+      setGold(g => g - 100); 
+      
+      const type = target.isTraitor ? 'RAZE' : 'PILLAGE';
+
+      const newMission = { 
+          id: Date.now() + Math.random(), 
+          type: type, 
+          heroes: roster.filter(h => army.includes(h.id) && h.status === 'IDLE').map(h => h.id), 
+          startTime: Date.now(), 
+          duration: 45000, 
+          targetVillageId: target.id 
+      }; 
+      setActiveMissions(prev => [...prev, newMission]); 
+      setRoster(prev => prev.map(h => { 
+          if (army.includes(h.id) && h.status === 'IDLE') return { ...h, status: 'MISSION', statusEndTime: Date.now() + 45000 }; 
+          return h; 
+      })); 
+      setDiplomacyTarget(null); 
+  };
+
+  const toggleHeroSelection = (id) => { 
+      if (view === 'MAP') { setSelectedHeroes(selectedHeroes.includes(id) ? [] : [id]); return; }
+      if (selectedMissionType && selectedMissionType.type === 'BOSS_TRAITOR') {
+          if (selectedHeroes.includes(id)) setSelectedHeroes([]); else setSelectedHeroes([id]); return;
+      }
+      if (selectedHeroes.includes(id)) setSelectedHeroes(prev => prev.filter(h => h !== id)); else if (selectedHeroes.length < 5) setSelectedHeroes(prev => [...prev, id]); 
+  };
+  const spawnRecruit = (isFree) => { 
+      const maxRoster = 5 + (buildings.HOUSING * 5);
+      const currentPop = roster.filter(h => h.status !== 'DEAD').length;
+      if (!isFree && currentPop >= maxRoster) { addNotification("Logements Pleins !", "error"); return; }
+      
+      const barracksLvl = buildings.BARRACKS;
+      const bonusStats = barracksLvl * 1; 
+      let newStats = { STR: 1, AGI: 1, END: 1, VIT: 1 };
+      let totalPointsTarget = Math.floor(Math.random() * (16 - 12 + 1)) + 12 + bonusStats;
+      let pointsLeft = totalPointsTarget - 4; 
+      while (pointsLeft > 0) { const keys = Object.keys(newStats); const randomKey = keys[Math.floor(Math.random() * keys.length)]; if (newStats[randomKey] < 8) { newStats[randomKey]++; pointsLeft--; } else { pointsLeft--; } }
+      
+      const startLevel = 1; 
+      let classType = 'UNKNOWN';
+
+      const newHero = { id: Date.now() + Math.random(), name: `${NAMES_PREFIX[Math.floor(Math.random()*10)]} ${LAST_NAMES[Math.floor(Math.random()*8)]}`, level: startLevel, stats: newStats, classType: classType, subClass: null, status: 'IDLE', history: [] }; 
+      setRoster(p => [...p, newHero]); 
+  };
+  const recruitHero = () => { if (gold < 20) return; setGold(g => g - 20); spawnRecruit(false); }; 
+  
+  const getBuildingCost = (key, currentLvl) => Math.floor(BUILDINGS_DATA[key].cost * Math.pow(1.5, currentLvl));
+  const upgradeBuilding = (k) => { 
+      if (construction) return; 
+      const cost = getBuildingCost(k, buildings[k]);
+      if (buildings[k] >= BUILDINGS_DATA[k].maxLvl || gold < cost) return; 
+      setGold(g => g - cost); 
+      setConstruction({ key: k, endTime: Date.now() + CONSTRUCTION_TIME });
+  };
+  
+  const determineClass = (stats) => {
+    const sorted = Object.entries(stats).sort(([,a], [,b]) => b - a);
+    const [s1, s2] = [sorted[0][0], sorted[1][0]];
+    if (s1 === 'STR' && s2 === 'AGI') return 'ASSASSIN';
+    if (s1 === 'VIT' && s2 === 'STR') return 'BERSERKER';
+    if (s1 === 'AGI' && s2 === 'END') return 'TRAPPER';
+    if (s1 === 'AGI' && s2 === 'STR') return 'ARCHER';
+    if (s1 === 'STR') return 'WARRIOR';
+    if (s1 === 'AGI') return 'SNIPER';
+    if (s1 === 'END') return 'RUNNER';
+    if (s1 === 'VIT') return 'PROTECTOR';
+    return 'WARRIOR';
+  };
+
+  const getSynergyAnalysis = (squad) => {
+    let roles = { TANK: 0, FRONTLINE: 0, BACKLINE: 0, SUPPORT: 0, DPS: 0, CIVIL: 0 };
+    squad.forEach(h => {
+        const role = CLASSES[h.classType].role;
+        roles[role] = (roles[role] || 0) + 1;
+        if (role === 'TANK') roles.FRONTLINE++;
+    });
+    let warnings = [];
+    let bonuses = [];
+    let defenseMod = 0;
+    let powerBonus = 0;
+    let timeBonus = false;
+
+    if (roles.FRONTLINE === 0 && roles.TANK === 0) {
+        warnings.push("PAS DE FRONTLINE (-4 Def)");
+        defenseMod -= 4;
+    } else if (roles.TANK > 0) {
+        bonuses.push("TANK (+2 Def)");
+        defenseMod += 2;
+    }
+    if (roles.DPS >= 2) {
+        bonuses.push("INFILTRATION (-20% Temps)");
+        timeBonus = true;
+    }
+    // FIX: BACKLINE BONUS INSTEAD OF FRONTLINE
+    if (roles.BACKLINE >= 2) {
+        bonuses.push("TIR DE SOUTIEN (+15 Att)");
+        powerBonus = 15;
+    }
+    if (roles.BACKLINE > 3) warnings.push("TROP D'ARCHERS");
+    if (roles.SUPPORT > 0) bonuses.push("SOUTIEN (Soins)");
+
+    return { defenseMod, warnings, bonuses, powerBonus, timeBonus };
+  };
+
+  const formatTime = (ms) => `${Math.ceil(ms / 1000)}s`;
+
+  const canFightWitch = gameStats.dungeons >= 10;
+  const canFightMercenary = gameStats.conflicts >= 4;
+  const canFightWanderer = gameStats.refused >= 5;
+  // FIX: Vagabond Shop available forever once boss killed
+  const showVagabondShop = gameStats.bossesKilled.includes('BOSS_WANDERER');
+  const showTraitor = gameStats.bossesKilled.includes('BOSS_WITCH') && villages.some(v => v.isTraitor) === false && gameStats.bossesKilled.includes('BOSS_MERCENARY');
+
+  const maxRoster = 5 + (buildings.HOUSING * 5);
+  const currentPop = roster.filter(h => h.status !== 'DEAD').length;
+  const currentSynergy = getSynergyAnalysis(roster.filter(h => selectedHeroes.includes(h.id)));
+  const getReputationLabel = (rep) => { if (rep >= 80) return { text: "Allié", color: "text-green-400" }; if (rep <= 20) return { text: "Ennemi", color: "text-red-500" }; return { text: "Neutre", color: "text-slate-400" }; };
+
+  if (gameState === 'VICTORY') {
+      return (
+          <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8">
+              <Crown size={64} className="text-yellow-500 mb-4"/>
+              <h1 className="text-4xl font-bold text-yellow-500 mb-2">VICTOIRE !</h1>
+              <p className="text-xl mb-8 text-center">Le Traître est tombé. Votre village est en paix.</p>
+              <div className="bg-slate-800 p-6 rounded border border-slate-700 w-full max-w-md">
+                  <h2 className="text-lg font-bold mb-4 border-b border-slate-700 pb-2">Rapport Final</h2>
+                  <div className="space-y-2">
+                      <div className="flex justify-between"><span>Jours survécus :</span> <span>{day}</span></div>
+                      <div className="flex justify-between"><span>Héros tombés :</span> <span className="text-red-400">{gameStats.deadCount}</span></div>
+                      <div className="flex justify-between"><span>Boss vaincus :</span> <span className="text-yellow-400">{gameStats.bossesKilled.length}</span></div>
+                      <div className="flex justify-between"><span>Richesse finale :</span> <span className="text-amber-400">{gold} Or</span></div>
+                  </div>
+              </div>
+              <button onClick={() => window.location.reload()} className="mt-8 bg-indigo-600 px-6 py-3 rounded font-bold hover:bg-indigo-500">Nouvelle Partie</button>
+          </div>
+      )
+  }
+
+  if (gameState.startsWith('DEFEAT')) {
+      return (
+          <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-8">
+              <Skull size={64} className="text-red-600 mb-4"/>
+              <h1 className="text-4xl font-bold text-red-600 mb-2">DÉFAITE</h1>
+              <p className="text-xl mb-8 text-center text-slate-400">
+                  {gameState === 'DEFEAT_DEAD' ? "Trop de morts (10+). Le peuple s'est révolté." : "Le Manoir du Maire a été détruit."}
+              </p>
+              <button onClick={() => window.location.reload()} className="mt-8 bg-slate-700 px-6 py-3 rounded font-bold hover:bg-slate-600">Réessayer</button>
+          </div>
+      )
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col md:flex-row relative">
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        {notifications.map(n => <div key={n.id} className={`p-4 rounded shadow-lg flex gap-2 ${n.type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}><span className="font-bold">{n.title}</span></div>)}
+      </div>
+
+      {currentEvent && <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center"><div className="bg-slate-800 p-6 rounded border border-amber-500 max-w-md"><h2 className="text-2xl mb-2 text-amber-500">{currentEvent.title}</h2><p className="mb-4">{currentEvent.text}</p>{currentEvent.choices.map((c, i) => <button key={i} onClick={() => handleEventChoice(c)} className="w-full bg-slate-700 p-3 mb-2 rounded text-left hover:bg-slate-600">{c.label}</button>)}</div></div>}
+
+      <div className="w-full md:w-72 bg-slate-800 border-r border-slate-700 flex flex-col">
+        <div className="p-6 border-b border-slate-700">
+          <h1 className="text-2xl font-bold text-amber-500 mb-2">Village Warlord</h1>
+          <div className="bg-slate-900 p-2 rounded mb-4 text-xs flex justify-between text-slate-400"><span>Jour {day}</span><span>{formatTime(20000 - (dayProgress/100)*20000)}</span></div>
+          <div className="w-full bg-slate-800 h-1 rounded mb-4"><div className="bg-blue-500 h-full transition-all duration-1000" style={{width: `${dayProgress}%`}}></div></div>
+          <div className="grid grid-cols-2 gap-2 text-center mb-4">
+             <div className="bg-slate-900 p-2 rounded"><span className="text-amber-400 font-bold block">{gold} Or</span></div>
+             <div className="bg-slate-900 p-2 rounded"><span className={`${security<30?'text-red-500':'text-green-500'} font-bold block`}>{security}% Secu</span></div>
+          </div>
+          <div className="bg-slate-800 p-2 rounded mb-4 text-center border border-slate-700 flex items-center justify-center gap-2">
+              <Gem size={16} className="text-purple-400"/> <span className="font-bold">{materials} Matériaux</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+             <button onClick={() => setView('DASHBOARD')} className={`p-3 rounded text-xs font-bold flex flex-col items-center gap-1 min-h-[60px] justify-center ${view==='DASHBOARD'?'bg-amber-600 text-white':'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><Home size={18} /> VILLAGE</button>
+             <button onClick={() => setView('ROSTER')} className={`p-3 rounded text-xs font-bold flex flex-col items-center gap-1 min-h-[60px] justify-center ${view==='ROSTER'?'bg-amber-600 text-white':'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><Users size={18} /> TROUPES</button>
+             <button onClick={() => setView('BUILDINGS')} className={`p-3 rounded text-xs font-bold flex flex-col items-center gap-1 min-h-[60px] justify-center ${view==='BUILDINGS'?'bg-amber-600 text-white':'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><Hammer size={18} /> BÂTIR</button>
+             <button onClick={() => { setView('MAP'); setSelectedHeroes([]); setDiplomacyTarget(null); }} className={`p-3 rounded text-xs font-bold flex flex-col items-center gap-1 min-h-[60px] justify-center ${view==='MAP'?'bg-amber-600 text-white':'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}><Map size={18} /> CARTE</button>
+          </div>
+        </div>
+
+        <div className="p-4 border-b border-slate-700 bg-slate-800/50 flex-grow-0">
+           <h4 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2"><Clock size={12}/> En Cours</h4>
+           <div className="space-y-2">
+             {construction && (
+                 <div className="bg-slate-900 rounded p-2 text-xs border-l-2 border-yellow-500">
+                     <div className="flex justify-between mb-1">
+                         <span className="text-yellow-500">Travaux ({BUILDINGS_DATA[construction.key].name})</span>
+                         <span>{formatTime(construction.endTime - now)}</span>
+                     </div>
+                     <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden"><div className="bg-yellow-500 h-full transition-all" style={{width: `${Math.max(0, 100 - ((construction.endTime - now) / CONSTRUCTION_TIME * 100))}%`}}></div></div>
+                 </div>
+             )}
+             {activeMissions.map(m => {
+               const progress = Math.min(100, ((now - m.startTime) / m.duration) * 100);
+               const color = m.type === 'DIPLOMACY' ? 'bg-blue-500' : m.type === 'PILLAGE' || m.type === 'RAZE' ? 'bg-red-600' : 'bg-amber-500';
+               const missionName = m.type === 'PILLAGE' ? 'Pillage' : m.type === 'RAZE' ? 'Siège' : m.type === 'DIPLOMACY' ? 'Diplomatie' : MISSION_TYPES.find(mt => mt.type === m.type)?.label || BOSS_MISSIONS[m.type.replace('BOSS_','')]?.label || m.type;
+               return (
+                 <div key={m.id} className="bg-slate-900 rounded p-2 text-xs">
+                   <div className="flex justify-between mb-1">
+                      <span className={`font-bold ${color.replace('bg-', 'text-')}`}>{missionName}</span>
+                      <span>{formatTime((m.startTime + m.duration) - now)}</span>
+                   </div>
+                   <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden"><div className={`${color} h-full transition-all duration-1000`} style={{width: `${progress}%`}}></div></div>
+                 </div>
+               );
+             })}
+             {roster.filter(h => h.status === 'INJURED' || h.status === 'LENT').map(h => {
+                const timeLeft = h.statusEndTime - now;
+                return (
+                  <div key={h.id} className="bg-slate-900 rounded p-2 text-xs border-l-2 border-red-500">
+                    <div className="flex justify-between mb-1">
+                        <span className="text-red-400">{h.name} {h.status === 'LENT' ? '(Prêt)' : '(Soin)'}</span>
+                        <span>{formatTime(timeLeft)}</span>
+                    </div>
+                  </div>
+                )
+             })}
+           </div>
+        </div>
+
+        <div className="p-4 bg-slate-800/50 flex-grow overflow-y-auto text-xs space-y-1">
+           {logs.map((l, i) => <div key={i} className="text-slate-400 border-l border-slate-600 pl-2"><span className="font-bold">J{l.day}:</span> {l.text}</div>)}
+        </div>
+      </div>
+
+      <div className="flex-grow p-6 overflow-y-auto bg-slate-900">
+        
+        {view === 'DASHBOARD' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-200"><Tent className="text-amber-600" /> Missions</h2>
+            
+            {!selectedMissionType && (
+              <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                {MISSION_TYPES.map(m => (
+                  <div key={m.type} onClick={() => { setSelectedMissionType(m); setSelectedHeroes([]); }} className="p-4 rounded border border-slate-700 bg-slate-800 hover:border-amber-500 cursor-pointer">
+                    <h3 className="font-bold text-slate-100">{m.label}</h3>
+                    <div className="text-xs text-slate-400 mb-2">{m.desc}</div>
+                    <div className="text-xs font-mono text-amber-500 flex justify-between">
+                        <span>RISQUE: {m.risk}</span>
+                        <span>RECOMPENSE: {m.reward === 'GOLD' ? 'OR' : m.reward === 'TAX' ? 'SÉCURITÉ' : 'MATÉRIAUX'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <h2 className="text-xl font-bold flex items-center gap-2 text-slate-200 mb-4"><Skull className="text-red-600" /> Menaces Légendaires (Boss)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {buildings.LIBRARY > 0 ? (
+                      <div onClick={() => { if(day > (bossCooldowns.BOSS_WITCH || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.WITCH, type: 'BOSS_WITCH', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_WITCH || 0) ? 'opacity-50 border-slate-700 cursor-not-allowed' : 'border-purple-500 bg-purple-900/10 hover:bg-purple-900/20'}`}>
+                          <h3 className="font-bold text-purple-400">La Sorcière</h3>
+                          <p className="text-xs text-slate-400">Coût: Gratuit. Loot unique.</p>
+                          <div className="text-xs text-purple-300 mt-1">Puissance Requise: ???</div>
+                      </div>
+                  ) : <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? (Nécessite Bibliothèque)</div>}
+
+                  {canFightMercenary ? (
+                      <div onClick={() => { if(day > (bossCooldowns.BOSS_MERCENARY || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.MERCENARY, type: 'BOSS_MERCENARY', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_MERCENARY || 0) ? 'opacity-50 cursor-not-allowed' : 'border-red-500 bg-red-900/10 hover:bg-red-900/20'}`}>
+                          <h3 className="font-bold text-red-400">Le Mercenaire</h3>
+                          <p className="text-xs text-slate-400">Armée seulement.</p>
+                          <div className="text-xs text-red-300 mt-1">Puissance Requise: ???</div>
+                      </div>
+                  ) : <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? ({gameStats.conflicts}/4 Conflits)</div>}
+
+                  {canFightWanderer && !gameStats.bossesKilled.includes('BOSS_WANDERER') ? (
+                      <div onClick={() => { if(day > (bossCooldowns.BOSS_WANDERER || 0)) { setSelectedMissionType({ ...BOSS_MISSIONS.WANDERER, type: 'BOSS_WANDERER', duration: 60000 }); setSelectedHeroes([]); } }} className={`p-4 rounded border cursor-pointer ${day <= (bossCooldowns.BOSS_WANDERER || 0) ? 'opacity-50 cursor-not-allowed' : 'border-amber-500 bg-amber-900/10'}`}>
+                          <h3 className="font-bold text-amber-400">Le Vagabond</h3>
+                          <div className="text-xs text-amber-300 mt-1">Puissance Requise: ???</div>
+                      </div>
+                  ) : !gameStats.bossesKilled.includes('BOSS_WANDERER') ? <div className="p-4 border border-dashed border-slate-700 text-slate-600 text-xs">??? ({gameStats.refused}/5 Refus)</div> : null}
+
+                  {/* BOSS FINAL */}
+                  {showTraitor && (
+                      <div onClick={() => { setSelectedMissionType({ ...BOSS_MISSIONS.TRAITOR, type: 'BOSS_TRAITOR', duration: 120000 }); setSelectedHeroes([]); }} className="p-4 rounded border cursor-pointer border-red-600 bg-red-950 animate-pulse">
+                          <h3 className="font-bold text-red-500">LE TRAÎTRE</h3>
+                          <p className="text-xs text-red-300">DUEL FINAL.</p>
+                      </div>
+                  )}
+              </div>
+              </>
+            )}
+
+            {selectedMissionType && (
+              <div className="bg-slate-800 p-6 rounded border border-slate-700">
+                 <div className="flex justify-between mb-4">
+                    <h3 className="font-bold text-lg">{selectedMissionType.label}</h3>
+                    <button onClick={() => setSelectedMissionType(null)} className="text-xs underline">Retour</button>
+                 </div>
+                 
+                 {/* SYNERGY ADVICE */}
+                 <div className="bg-slate-900/50 rounded p-3 mb-4 border border-slate-700/50">
+                   {currentSynergy.warnings.map((w, i) => <div key={i} className="text-xs text-red-400 flex items-center gap-2"><AlertTriangle size={12}/> {w}</div>)}
+                   {currentSynergy.bonuses.map((b, i) => <div key={i} className="text-xs text-green-400 flex items-center gap-2"><Star size={12}/> {b}</div>)}
+                   <div className="text-xs text-slate-500 mt-1 pt-1 border-t border-slate-700">
+                       Bonus: {currentSynergy.defenseMod > 0 ? '+' : ''}{currentSynergy.defenseMod} Défense • {currentSynergy.powerBonus} Attaque
+                       {buildings.BARRACKS > 0 && <span className="ml-2 text-blue-400"> (+{(buildings.BARRACKS * 10)}% XP Caserne)</span>}
+                   </div>
+                 </div>
+
+                 {selectedMissionType.type === 'BOSS_MERCENARY' ? (
+                     <div className="text-center py-8 border-2 border-red-900 bg-red-900/20 rounded mb-4">
+                         <h4 className="text-xl text-red-500 font-bold mb-2">DÉPLOIEMENT MASSIF</h4>
+                         <p className="text-sm text-red-300 mb-4">Toute l'Armée Permanente sera envoyée au combat.</p>
+                         <p className="text-xs text-slate-400">Effectif actuel : {army.length} / 10</p>
+                     </div>
+                 ) : (
+                    <div className="grid grid-cols-5 gap-2 mb-4">
+                        {roster.map(h => {
+                            const isSel = selectedHeroes.includes(h.id);
+                            const isBusy = h.status !== 'IDLE' || (army.includes(h.id) && selectedMissionType.type !== 'BOSS_TRAITOR'); // Army blocked except for Traitor/Raid logic
+                            const levelStyle = LEVEL_STYLES[Math.min(5, h.level)];
+                            return (
+                                <button key={h.id} disabled={isBusy} onClick={() => toggleHeroSelection(h.id)} className={`p-2 rounded border text-xs text-left ${isSel ? 'ring-2 ring-orange-500 bg-orange-900/20' : `${levelStyle.border} ${levelStyle.bg}`} ${isBusy ? 'opacity-30' : ''}`}>
+                                    <div className="font-bold">{h.name}</div>
+                                    <div className="text-[10px]">Lvl {h.level} {h.item && '⚔️'}</div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                 )}
+                 
+                 <button onClick={launchMission} disabled={selectedMissionType.type !== 'BOSS_MERCENARY' && selectedHeroes.length===0} className="w-full bg-amber-600 py-2 rounded font-bold hover:bg-amber-500 disabled:opacity-50">
+                     {selectedMissionType.type === 'BOSS_MERCENARY' ? "DÉPLOYER L'ARMÉE" : "LANCER MISSION"}
+                 </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'ROSTER' && (
+          <div>
+            <div className="flex justify-between mb-4">
+               <h2 className="text-xl font-bold text-slate-200">Effectifs ({roster.filter(h=>h.status!=='DEAD').length} / {maxRoster})</h2>
+               <button onClick={recruitHero} disabled={gold<20} className="bg-indigo-600 px-3 py-1 rounded text-xs">Recruter (20 Or)</button>
+            </div>
+            
+            <div className="mb-4 p-2 bg-slate-800 rounded border border-slate-700 flex gap-2 items-center flex-wrap">
+                <span className="text-xs font-bold text-slate-400">Coffre:</span>
+                {inventory.length === 0 && <span className="text-xs text-slate-600 italic">Vide</span>}
+                {inventory.map((item, i) => (
+                    <div key={i} className="text-xs bg-slate-900 px-2 py-1 rounded border border-slate-600 text-amber-200 cursor-help relative group">
+                        {item.name}
+                        {/* Tooltip */}
+                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 p-2 bg-black border border-slate-600 rounded text-[10px] text-slate-300 hidden group-hover:block z-10">
+                            <div className="font-bold text-white">{item.name}</div>
+                            <div>+{item.val} {item.stat}</div>
+                            <div className="italic text-slate-500">{item.desc}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                {roster.filter(h => h.status !== 'DEAD').map(h => {
+                    const levelStyle = LEVEL_STYLES[Math.min(5, h.level)];
+                    return (
+                    <div key={h.id} className={`border p-3 rounded relative ${army.includes(h.id) ? 'border-red-500 bg-red-900/10' : `${levelStyle.border} ${levelStyle.bg} ${levelStyle.shadow}`}`}>
+                        <div className="flex justify-between">
+                            <h3 className="font-bold">{h.name}</h3>
+                            <span className="text-xs bg-slate-900/50 px-1 rounded">Lvl {h.level}</span>
+                        </div>
+                        <div className={`text-xs font-bold mb-2 ${CLASSES[h.classType].color}`}>
+                            {h.classType !== 'UNKNOWN' ? CLASSES[h.classType].name : 'Recrue'}
+                            {h.subClass && <span className="text-slate-400 font-normal"> - {h.subClass}</span>}
+                        </div>
+                        <div className="grid grid-cols-4 gap-1 text-[10px] text-slate-400 bg-slate-900/50 p-1 rounded mb-2">
+                          <span title="Force">STR {h.stats.STR}</span>
+                          <span title="Agilité">AGI {h.stats.AGI}</span>
+                          <span title="Endurance">END {h.stats.END}</span>
+                          <span title="Vitalité">VIT {h.stats.VIT}</span>
+                        </div>
+                        {h.socialTrait && <div className="text-[10px] text-amber-300 mb-2 border-t border-slate-600/50 pt-1">{h.socialTrait.name}: {h.socialTrait.desc}</div>}
+                        <div className="mt-2 p-2 bg-slate-900/50 rounded flex justify-between items-center">
+                            {h.item ? (
+                                <div className="flex items-center justify-between w-full group relative cursor-help">
+                                  <span className="text-xs text-purple-300">{h.item.name}</span>
+                                  <button onClick={() => unequipItem(h.id)} className="text-[10px] text-red-400 hover:underline">Retirer</button>
+                                  <div className="absolute bottom-full mb-2 left-0 w-48 p-2 bg-black border border-slate-600 rounded text-[10px] text-slate-300 hidden group-hover:block z-10"><div>+{h.item.val} {h.item.stat}</div><div className="italic">{h.item.desc}</div></div>
+                                </div>
+                            ) : (
+                                <><span className="text-xs text-slate-500">Vide</span>{inventory.length > 0 && <button onClick={() => equipItem(h.id, 0)} className="text-[10px] text-blue-400 hover:underline">Équiper</button>}</>
+                            )}
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                            {h.level >= 5 && h.status === 'IDLE' && <button onClick={() => toggleArmy(h.id)} className={`flex-1 py-1 text-[10px] border rounded ${army.includes(h.id) ? 'text-red-400 border-red-500' : 'text-slate-400 border-slate-600'}`}>{army.includes(h.id) ? 'Sortir Armée' : 'Armée'}</button>}
+                            {buildings.MERC_GUILD > 0 && h.status === 'IDLE' && !army.includes(h.id) && <button onClick={() => sellHero(h.id)} className="flex-1 py-1 text-[10px] border border-amber-600 text-amber-500 rounded hover:bg-amber-900/20">Vendre (+{h.level*5})</button>}
+                        </div>
+                    </div>
+                )})}
+            </div>
+
+            {roster.some(h => h.status === 'DEAD') && (
+                <div className="border-t border-slate-700 pt-4">
+                    <h3 className="text-slate-500 font-bold mb-2 flex items-center gap-2"><Cross size={16}/> Cimetière (Derniers Héros)</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {roster.filter(h => h.status === 'DEAD').map(h => (
+                            <div key={h.id} className="bg-slate-900 border border-slate-800 p-2 rounded text-xs text-slate-600 flex flex-col gap-1 grayscale opacity-60 cursor-help group relative">
+                                <div className="flex justify-between"><span>{h.name}</span><span>Lvl {h.level}</span></div>
+                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 p-2 bg-black border border-red-900 rounded text-[10px] text-red-400 hidden group-hover:block z-10"><div className="font-bold text-white">Mort au Jour {h.deathDay || '?'}</div><div>{h.deathReason || 'Cause inconnue'}</div></div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+          </div>
+        )}
+
+        {view === 'BUILDINGS' && (
+          <div className="grid grid-cols-2 gap-4">
+             {Object.entries(BUILDINGS_DATA).map(([k, d]) => (
+                 (!d.hidden || (k === 'LIBRARY' && canFightWitch) || (k === 'VAGABOND_SHOP' && showVagabondShop)) && (
+                   <div key={k} className="bg-slate-800 border border-slate-700 p-4 rounded relative overflow-hidden">
+                       {d.icon && <div className="absolute top-4 right-4 text-slate-700 opacity-20 transform scale-150"><d.icon size={64}/></div>}
+                       <div className="flex justify-between relative z-10">
+                           <h3 className="font-bold">{d.name}</h3>
+                           <span className="text-xs text-amber-500">Niv {buildings[k]} / {d.maxLvl}</span>
+                       </div>
+                       <p className="text-xs text-slate-400 mb-2 relative z-10">{d.desc}</p>
+                       <button onClick={() => upgradeBuilding(k)} disabled={buildings[k] >= d.maxLvl || gold < getBuildingCost(k, buildings[k]) || construction} className="w-full bg-purple-600 py-2 rounded text-xs disabled:opacity-50 relative z-10">
+                           {buildings[k] >= d.maxLvl ? 'MAX' : `Améliorer (${getBuildingCost(k, buildings[k])} Or)`}
+                       </button>
+                       {k === 'ARTISAN_GUILD' && buildings[k] > 0 && (
+                           <button onClick={craftRelic} className="w-full mt-2 bg-indigo-600 py-2 rounded text-xs text-white flex justify-center items-center gap-1 relative z-10"><Anvil size={12}/> Fabriquer (50 Or, 20 Mat)</button>
+                       )}
+                       {k === 'VAGABOND_SHOP' && buildings[k] > 0 && (
+                           <button onClick={buyMaterial} className="w-full mt-2 bg-amber-700 py-2 rounded text-xs text-white relative z-10">
+                               {day < lastVagabondPurchaseDay + 7 ? `Stock épuisé (${(lastVagabondPurchaseDay + 7) - day}j)` : "Acheter Matériaux (50 Or)"}
+                           </button>
+                       )}
+                   </div>
+                 )
+             ))}
+          </div>
+        )}
+
+        {view === 'MAP' && (
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-slate-200">Monde Extérieur</h2>
+                {villages.length === 0 && <div className="text-center text-slate-500 p-10 border-2 border-dashed border-slate-700">Inexploré. Attendez jour 2.</div>}
+                <div className="grid grid-cols-2 gap-4">
+                    {villages.map(v => {
+                        const activeMission = activeMissions.find(m => m.targetVillageId === v.id);
+                        const isTarget = diplomacyTarget && diplomacyTarget.id === v.id;
+                        return (
+                            <div key={v.id} className={`bg-slate-800 p-4 border-2 rounded ${isTarget ? 'border-blue-500' : 'border-slate-700'}`}>
+                                <div className="flex justify-between mb-2">
+                                    <h3 className="font-bold flex items-center gap-2">{v.isTraitor && <UserMinus size={16} className="text-red-500"/>}{v.name}</h3>
+                                    <span className={`text-xs px-2 rounded ${v.reputation > 80 ? 'bg-green-900 text-green-400' : v.reputation < 20 ? 'bg-red-900 text-red-400' : 'bg-slate-700'}`}>{v.isTraitor ? 'TRAÎTRE' : `${v.reputation}/100`}</span>
+                                </div>
+                                {activeMission ? (
+                                    <div className="text-xs text-amber-500 flex items-center gap-2"><Clock size={12} className="animate-spin"/> Mission en cours...</div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        {!v.isTraitor && <button onClick={() => { setDiplomacyTarget(v); setSelectedHeroes([]); }} className="flex-1 bg-blue-900/50 border border-blue-800 text-blue-200 text-xs py-1 rounded">Diplomatie</button>}
+                                        <button onClick={() => { setDiplomacyTarget(v); launchPillage(v); }} className={`flex-1 text-xs py-1 rounded border ${v.isTraitor ? 'bg-red-950 border-red-600 text-red-500 font-bold' : 'bg-red-900/50 border-red-800 text-red-200'}`}>{v.isTraitor ? 'RASER (Armée)' : 'Piller'}</button>
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+                {diplomacyTarget && !activeMissions.find(m => m.targetVillageId === diplomacyTarget.id) && (
+                    <div className="bg-slate-800 p-4 border-t border-slate-700 mt-4">
+                        <h3 className="font-bold text-blue-400 mb-2">Mission vers {diplomacyTarget.name}</h3>
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                            {roster.filter(h => h.status === 'IDLE' && !army.includes(h.id)).map(h => {
+                                const levelStyle = LEVEL_STYLES[Math.min(5, h.level)];
+                                const isSel = selectedHeroes.includes(h.id);
+                                return (
+                                <button key={h.id} onClick={() => toggleHeroSelection(h.id)} className={`min-w-[100px] p-2 border rounded text-xs text-left relative ${isSel ? 'ring-2 ring-orange-500 bg-orange-900/20' : `${levelStyle.border} ${levelStyle.bg}`}`}>
+                                    <div className="font-bold truncate">{h.name}</div>
+                                    <div>Lvl {h.level}</div>
+                                    {h.socialTrait && h.socialTrait.name === 'Diplomate' && (
+                                        <div className="absolute top-1 right-1 text-yellow-400 animate-pulse"><Star size={12} fill="currentColor"/></div>
+                                    )}
+                                </button>
+                            )})}
+                        </div>
+                        <div className="flex justify-end gap-2 mt-2">
+                            <button onClick={() => setDiplomacyTarget(null)} className="text-xs text-slate-400">Annuler</button>
+                            <button onClick={launchDiplomacy} disabled={selectedHeroes.length !== 1} className="bg-blue-600 px-4 py-1 rounded text-xs font-bold disabled:opacity-50">Envoyer Diplomate (50 Or)</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )}
+
+      </div>
+    </div>
+  );
+}

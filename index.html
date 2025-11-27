@@ -145,7 +145,7 @@
         const DAY_DURATION = 20000; 
         const CONSTRUCTION_TIME = 20000; 
 
-        // --- FONCTIONS UTILITAIRES ---
+        // --- FONCTIONS UTILITAIRES (HORS DU COMPOSANT POUR SCOPE) ---
         const formatTime = (ms) => `${Math.ceil(ms / 1000)}s`;
 
         const getReputationLabel = (rep) => { 
@@ -739,16 +739,22 @@
             };
 
             const launchMission = () => { 
-                if (!selectedMissionType || selectedHeroes.length === 0) {
-                    if (selectedMissionType && selectedMissionType.type !== 'BOSS_MERCENARY') return;
-                    if (!selectedMissionType) return;
+                if (!selectedMissionType) return;
+                
+                // VERIF UNIQUE BOSS ACTIVE
+                if (activeMissions.some(m => m.type === selectedMissionType.type)) {
+                    addNotification("Mission déjà en cours sur cette cible !", "error");
+                    return;
                 }
 
+                // ARMY CHECK FOR MERCENARY
                 if (selectedMissionType.type === 'BOSS_MERCENARY') {
                     if (army.length === 0) { addNotification("Armée requise (Soldats Niv 5) !", "error"); return; }
                 } else if (selectedMissionType.type === 'BOSS_WITCH') {
                     if (buildings.LIBRARY < 1) { addNotification("Bibliothèque requise !", "error"); return; }
                     // Free
+                } else if (selectedHeroes.length === 0) {
+                    return; // No heroes selected for standard mission
                 } else {
                     if (gold < 50) { addNotification("Pas assez d'or (50 requis).", "error"); return; }
                     setGold(g => g - 50); 
@@ -984,7 +990,7 @@
                                 <div className="text-xs text-slate-400 mb-2">{m.desc}</div>
                                 <div className="text-xs font-mono text-amber-500 flex justify-between">
                                     <span>RISQUE: {m.risk}</span>
-                                    <span>RECOMPENSE: {m.reward === 'GOLD' ? 'OR' : m.reward === 'TAX' ? 'SÉCURITÉ' : 'MATÉRIAUX'}</span>
+                                    <span>DIFF: {m.difficulty}</span>
                                 </div>
                             </div>
                             ))}
